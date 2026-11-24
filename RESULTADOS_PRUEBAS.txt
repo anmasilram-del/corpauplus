@@ -1,0 +1,42 @@
+OK · guía JSON válida
+OK · guía de otra prueba rechazada
+OK · conflictos de guía impiden validación
+OK · reparto de puntos distinto de diez rechazado
+OK · localización sin topónimos de referencia rechazada
+OK · JSON puro y bloque Markdown
+OK · JSON incompleto rechazado
+OK · prompt de guía incluye identificador y reglas
+OK · prompt de corrección incluye guía, código, páginas y solicitud
+OK · resultado correcto: 9
+OK · resultado con type incorrecto rechazado
+OK · resultado con examId incorrecto rechazado
+OK · resultado con code incorrecto rechazado
+OK · resultado con requestId incorrecto rechazado
+OK · apartado ausente rechazado
+OK · apartado duplicado rechazado
+OK · puntuación excesiva rechazada
+OK · puntuación negativa rechazada
+OK · topónimo sin tilde invalida localización
+OK · topónimo con mayúscula incorrecta invalida localización
+OK · variante aprobada aceptada
+OK · ubicación incorrecta invalida localización
+OK · mapa dudoso marcado para revisión
+OK · dos primeras faltas sin descuento
+OK · tercera falta descuenta 0,10
+OK · sin doble penalización de mapa aunque IA lo etiquete mal
+OK · error normal no excluido aunque IA lo etiquete mapa
+OK · faltas repetidas o dudosas no se acumulan
+OK · máximo ortográfico un punto
+OK · nota nunca negativa
+OK · falta sin apartado válido rechazada
+OK · códigos consecutivos sin reutilizar al borrar
+OK · CSV protege fórmulas
+OK · copia cifrada no incluye datos en claro
+OK · copia cifrada restaurable
+OK · contraseña incorrecta rechazada
+OK · copia alterada rechazada
+
+37/37 pruebas superadas.
+
+Comprobaciones adicionales estáticas: sintaxis de app.js y sw.js; referencias de ID HTML; iconos y archivos de la PWA. Correctas.
+Prueba de navegador: Chromium inició, pero la navegación HTTP local fue rechazada con ERR_BLOCKED_BY_ADMINISTRATOR. No se ejecutó el flujo gráfico completo. No probado en Android, GitHub Pages ni con ChatGPT real. Las 37 pruebas utilizan datos ficticios y no validan precisión pedagógica o lectura de fotografías.
