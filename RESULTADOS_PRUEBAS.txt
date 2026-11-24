@@ -1,3 +1,4 @@
+Corrector PAU v7 — pruebas ejecutadas
 OK · guía JSON válida
 OK · guía de otra prueba rechazada
 OK · conflictos de guía impiden validación
@@ -37,6 +38,19 @@ OK · contraseña incorrecta rechazada
 OK · copia alterada rechazada
 
 37/37 pruebas superadas.
-
-Comprobaciones adicionales estáticas: sintaxis de app.js y sw.js; referencias de ID HTML; iconos y archivos de la PWA. Correctas.
-Prueba de navegador: Chromium inició, pero la navegación HTTP local fue rechazada con ERR_BLOCKED_BY_ADMINISTRATOR. No se ejecutó el flujo gráfico completo. No probado en Android, GitHub Pages ni con ChatGPT real. Las 37 pruebas utilizan datos ficticios y no validan precisión pedagógica o lectura de fotografías.
+OK · contraseña corta rechazada
+OK · sal inválida rechazada
+OK · clave no exportable
+OK · cifrado y recuperación íntegra
+OK · registro cifrado no contiene datos de prueba en claro
+OK · contraseña incorrecta rechazada
+OK · alteración del cifrado rechazada
+OK · alteración de revisión rechazada
+OK · alteración del nonce rechazada
+OK · nonce distinto en cada guardado
+OK · lectura con clave derivada de nuevo
+OK · registro antiguo reconocido como no cifrado
+12/12 pruebas de cifrado superadas.
+OK · sintaxis app.js
+OK · sintaxis sw.js
+Prueba Chromium: BLOQUEADA (net::ERR_BLOCKED_BY_ADMINISTRATOR). No se verifica interfaz, bloqueo en navegador, IndexedDB real ni Android.
