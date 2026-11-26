@@ -1,4 +1,4 @@
-name: Publicar Corrector PAU v10.2
+name: Publicar Auto - GER v12.2
 on:
   push:
     branches: [main]
@@ -21,7 +21,7 @@ jobs:
       - name: Preparar exclusivamente archivos públicos
         run: |
           mkdir -p site/vendor
-          cp index.html app.js ui.css core.mjs exchange.mjs backup.mjs vault.mjs cleanup.mjs grade-report.mjs exam-tools.mjs pdf-output.mjs scan-pdf.mjs manifest.json sw.js icon-192.png icon-512.png icon.svg site/
+          cp index.html app.js ui.css core.mjs exchange.mjs backup.mjs vault.mjs cleanup.mjs library.mjs classes.mjs annotations.mjs grade-report.mjs exam-tools.mjs pdf-output.mjs scan-pdf.mjs manifest.json sw.js icon-192.png icon-512.png icon.svg site/
           touch site/.nojekyll
           # Biblioteca PDF local, versión fija. No se reciben exámenes durante la construcción.
           npm pack pdfjs-dist@4.10.38 --ignore-scripts --pack-destination /tmp
@@ -29,6 +29,7 @@ jobs:
           cp /tmp/package/legacy/build/pdf.mjs /tmp/package/legacy/build/pdf.worker.mjs site/vendor/
           cp /tmp/package/LICENSE site/vendor/LICENSE-pdfjs.txt
           node --input-type=module --check < site/app.js
+          for f in site/*.mjs site/sw.js; do node --check "$f"; done
           test -s site/vendor/pdf.mjs && test -s site/vendor/pdf.worker.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
