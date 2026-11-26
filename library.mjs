@@ -22,3 +22,18 @@ export function materialManifest(exam){return Object.entries(exam.materials||{})
 export function manifestText(exam){return materialManifest(exam).map(f=>`${materialLabels[f.kind]||f.kind}: ${f.name}${f.sourcePath?' ['+f.sourcePath+']':''}`).join('\n')||'Sin materiales';}
 export function safeFileName(name){return String(name).replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').replace(/^\.+/,'_').slice(0,160).trim()||'archivo'}
 export function packEntries(exam,prompt,pending=null,includeMaterials=true){const files=[],used=new Set(['00-instrucciones.txt']),mappings=[];const add=(original,data,kind)=>{const base=safeFileName(original);let name=base,n=2;while(used.has(name.toLocaleLowerCase('es')))name=`${n++}-${base}`;used.add(name.toLocaleLowerCase('es'));const match=/^data:[^,]*;base64,([A-Za-z0-9+/=]+)$/.exec(data);if(!match)throw Error('Archivo local inválido: '+original);files.push({name,data:match[1]});if(name!==original)mappings.push(`${name} = ${original} (${kind})`)};if(includeMaterials)for(const f of materialManifest(exam))add(f.name,f.data,materialLabels[f.kind]||f.kind);if(pending)pending.photos.forEach((s,i)=>add(`${pending.code}-P${String(i+1).padStart(2,'0')}.jpg`,s,'página del examen'));const text=prompt+(mappings.length?'\n\nCorrespondencia de nombres del paquete (usa el nombre original al referenciar figuras):\n'+mappings.join('\n'):'');if(files.length>1000||files.reduce((sum,f)=>sum+Math.ceil(f.data.length*3/4),new TextEncoder().encode(text).length)>200*1024*1024)throw Error('Paquete superior a 200 MB o 1000 archivos. Descarga los documentos individualmente.');return [['00-instrucciones.txt',text],...files.map(f=>[f.name,Uint8Array.from(atob(f.data),c=>c.charCodeAt(0))])];}
+
+// Vista de biblioteca: orden natural, conteos y filtros sin modificar el almacén.
+const natural=new Intl.Collator('es',{numeric:true,sensitivity:'base'});
+const searchKey=s=>String(s??'').normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase('es');
+export const libraryKinds=['content','rubric','solution','model','instructions'];
+export function browseFolders(lib,parentId=null,query=''){
+ const q=searchKey(query).trim(); const matches=lib.filter(f=>q?searchKey(folderPath(lib,f.id)).includes(q):(f.parentId||null)===parentId);
+ return matches.sort((a,b)=>(a.id===PAU?-1:b.id===PAU?1:natural.compare(q?folderPath(lib,a.id):a.title,q?folderPath(lib,b.id):b.title))).map(f=>{
+  const ids=new Set([f.id]);let previous=-1;while(previous!==ids.size){previous=ids.size;for(const x of lib)if(ids.has(x.parentId))ids.add(x.id)}
+  return {id:f.id,title:f.title,path:folderPath(lib,f.id),direct:f.files.length,total:lib.reduce((n,x)=>n+(ids.has(x.id)?x.files.length:0),0),children:lib.filter(x=>x.parentId===f.id).length,pau:(()=>{let x=f;while(x){if(x.id===PAU)return true;x=lib.find(y=>y.id===x.parentId)}return false})()};
+ });
+}
+export function browseFiles(folder,kind='all',query=''){
+ const q=searchKey(query).trim();return (folder?.files||[]).map((file,index)=>({file,index})).filter(({file})=>(kind==='all'||file.kind===kind)&&searchKey(file.name).includes(q)).sort((a,b)=>libraryKinds.indexOf(a.file.kind)-libraryKinds.indexOf(b.file.kind)||natural.compare(a.file.name,b.file.name));
+}
