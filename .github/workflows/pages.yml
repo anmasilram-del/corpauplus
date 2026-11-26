@@ -1,4 +1,4 @@
-name: Publicar Auto - GER v12.2
+name: Publicar Auto - GER v12.6
 on:
   push:
     branches: [main]
