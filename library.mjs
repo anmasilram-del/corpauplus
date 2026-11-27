@@ -37,3 +37,28 @@ export function browseFolders(lib,parentId=null,query=''){
 export function browseFiles(folder,kind='all',query=''){
  const q=searchKey(query).trim();return (folder?.files||[]).map((file,index)=>({file,index})).filter(({file})=>(kind==='all'||file.kind===kind)&&searchKey(file.name).includes(q)).sort((a,b)=>libraryKinds.indexOf(a.file.kind)-libraryKinds.indexOf(b.file.kind)||natural.compare(a.file.name,b.file.name));
 }
+
+// v13.1 — required material roles are independent of the file extension or filename.
+export function correctionType(exam){return exam?.correctionType==='task'?'task':'exam';}
+export function requiredRoles(exam){return correctionType(exam)==='task'?['model','rubric']:['content','instructions','rubric'];}
+export function missingRoles(exam){const m=materialManifest(exam);return requiredRoles(exam).filter(k=>!m.some(f=>f.kind===k&&f.data));}
+export function correctionRoleLabel(kind,exam){return kind==='model'?(correctionType(exam)==='task'?'Enunciado de la tarea':'Enunciado del examen'):materialLabels[kind]||kind;}
+export function archiveReferenceFiles(lib,folderId,title,entries){
+ let next=lib;let id=folderId;
+ if(!id){const name=String(title||'Material docente').trim().slice(0,100)||'Material docente';const old=next.find(f=>!f.parentId&&f.title.toLocaleLowerCase('es')===name.toLocaleLowerCase('es'));if(old)id=old.id;else{next=addFolder(next,name);id=next.at(-1).id;}}
+ const clean=entries.map(({kind,name,data})=>({kind,name,data}));next=addLibraryFiles(next,id,clean);
+ return {library:next,folderId:id,entries:clean.map(f=>({...f,sourcePath:folderPath(next,id)}))};
+}
+
+// Recover references that older drafts kept only inside a test. Never copy student scans.
+export function archiveUnlinkedReferences(lib,exam,folderId=null){
+ let library=lib;const updated=structuredClone(exam.materials);const linked=[];
+ for(const [bucket,files] of Object.entries(updated))for(const f of files){
+  if(f.sourcePath)continue;
+  const kind=f.role||(f.instruction?'instructions':bucket),name=kind==='instructions'?f.name.replace(/^Instrucciones — /,''):kind==='solution'?f.name.replace(/^Solucionario — /,''):f.name;
+  let folder=library.find(x=>x.files.some(z=>z.kind===kind&&z.name===name&&z.data===f.data));
+  if(!folder){const a=archiveReferenceFiles(library,folderId,exam.title,[{kind,name,data:f.data}]);library=a.library;folder=library.find(x=>x.id===a.folderId);}
+  f.sourcePath=folderPath(library,folder.id);linked.push({kind,name,data:f.data,sourcePath:f.sourcePath,folderId:folder.id});
+ }
+ return {library,materials:updated,linked};
+}

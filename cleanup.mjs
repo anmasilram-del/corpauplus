@@ -18,5 +18,5 @@ export function cleanupState(state,id,{keepMaterials=false,acknowledged=false,al
  if(!acknowledged||confirmation.trim()!=='BORRAR')throw Error('Confirma que has guardado las notas necesarias y escribe BORRAR.');
  if(summary.pending&&!allowPending)throw Error('Hay exámenes pendientes. Termina de corregirlos o autoriza expresamente su eliminación.');
  // Conserva la numeración y revisión, así como los datos ajenos al ámbito escogido.
- return {...state,library:id===ALL&&eraseLibrary?[{id:'pau',title:'Material PAU',files:[]}]:state.library,exams:keepMaterials?state.exams:state.exams.filter(e=>id!==ALL&&e.id!==id),pending:state.pending.filter(p=>!match(p)),records:state.records.filter(r=>!match(r))};
+ return {...state,library:id===ALL&&eraseLibrary?[{id:'pau',title:'Material PAU',files:[]}]:state.library,exams:keepMaterials?state.exams.map(e=>{if(id!==ALL&&e.id!==id)return e;const {scanSource,scanConfig,...rest}=e;return rest;}):state.exams.filter(e=>id!==ALL&&e.id!==id),pending:state.pending.filter(p=>!match(p)),records:state.records.filter(r=>!match(r))};
 }

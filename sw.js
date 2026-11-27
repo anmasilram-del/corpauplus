@@ -1,6 +1,6 @@
 // Cache exclusivamente de archivos públicos. No guarda datos de usuario.
 const PREFIX='pau-static:'+self.registration.scope+':';
-const CACHE=PREFIX+'v12-7-biblioteca-1';
+const CACHE=PREFIX+'v13-1-repositorio-1';
 const CORE=['./','./index.html','./ui.css','./app.js','./exchange.mjs','./core.mjs','./backup.mjs','./vault.mjs','./cleanup.mjs','./library.mjs','./classes.mjs','./annotations.mjs','./grade-report.mjs','./exam-tools.mjs','./pdf-output.mjs','./scan-pdf.mjs','./manifest.json','./icon-192.png','./icon-512.png','./icon.svg'];
 const OPTIONAL=['./vendor/pdf.mjs','./vendor/pdf.worker.mjs'];
 const url=f=>new URL(f,self.registration.scope).href;
