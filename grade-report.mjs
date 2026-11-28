@@ -1,15 +1,15 @@
-import {officialLabel,exactLabel,localStudentName} from './core.mjs';
+import {officialLabel,exactLabel} from './core.mjs';
 import {ALL,exportGrades} from './cleanup.mjs';
 import {makePDF} from './pdf-output.mjs';
 const fmt=n=>n.toFixed(2).replace('.',',');
 export function reportData(state,id=ALL){
  if(id!==ALL&&!state.exams.some(e=>e.id===id))throw Error('Selecciona una prueba existente.');
- const rows=state.records.filter(r=>id===ALL||r.examId===id).map(r=>({code:r.code,localName:localStudentName(state,r),title:state.exams.find(e=>e.id===r.examId)?.title||'Prueba sin título',...r.grade,provisional:!!r.provisional})).sort((a,b)=>a.code.localeCompare(b.code,'es',{numeric:true}));
+ const rows=state.records.filter(r=>id===ALL||r.examId===id).map(r=>({code:r.code,title:state.exams.find(e=>e.id===r.examId)?.title||'Prueba sin título',...r.grade})).sort((a,b)=>a.code.localeCompare(b.code,'es',{numeric:true}));
  if(!rows.length)throw Error('No hay calificaciones validadas en esta selección.');
  return {title:id===ALL?'Todas las pruebas':state.exams.find(e=>e.id===id).title,rows,mean:rows.reduce((a,b)=>a+b.final,0)/rows.length};
 }
-const headings=['Alumno / código','Prueba','Técnica / 10','Docente / 10'];
-const values=r=>[r.localName?r.localName+"\n"+r.code:r.code,r.title+(r.provisional?' [PROPUESTA]':''),exactLabel(r),officialLabel(r)];
+const headings=['Código','Prueba','Técnica / 10','Docente / 10'];
+const values=r=>[r.code,r.title,exactLabel(r),officialLabel(r)];
 function wrap(s,max){const out=[];for(const paragraph of String(s).split(/\r?\n/)){let line='';for(const word of paragraph.split(/\s+/).filter(Boolean)){for(let i=0;i<word.length;i+=max){const part=word.slice(i,i+max);if(line&&(line.length+part.length+1>max)){out.push(line);line=''}line+=(line?' ':'')+part}}out.push(line)}return out}
 export function gradesPDF(data){
  const pages=[];let ops,y;const xs=[45,169,398,478],max=[20,35,12,12];
