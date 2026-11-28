@@ -24,7 +24,7 @@ export function planFromRepository(exam){const g=unifiedGuide(exam);if(!g)return
 // One response file per small batch. A legacy set of references may produce the
 // plan and the first results in the same response, never an intermediate round trip.
 export function batchCorrectionPrompt(exam, rows){
- if(!Array.isArray(rows)||!rows.length||rows.length>5)throw Error('Selecciona de 1 a 5 exámenes.');
+ if(!Array.isArray(rows)||!rows.length||rows.length>500)throw Error('Selecciona de 1 a 500 exámenes.');
  const planExample={guide:'Criterios y decisiones',conflicts:[],items:[{id:'1',name:'Indicador',kind:'normal',max:10,criteria:'Respuesta y criterios',accepted:[]}]};
  const list=rows.map(p=>({code:p.code,requestId:p.requestId,pages:p.photos.map((_,i)=>`${p.code}-P${String(i+1).padStart(2,'0')}.jpg`),originalPages:p.batchSource?.pages||[]}));
  const samplePlan=exam.plan||planExample;
