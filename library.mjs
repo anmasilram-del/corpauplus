@@ -1,9 +1,10 @@
+import {validatePlan} from './core.mjs';
 // Árbol de carpetas cifrado; la raíz se representa con parentId=null.
 export const PAU='pau';
 export const pauFolders=[['pau-q1','Pregunta 1 · Teoría y noticia'],['pau-q2','Pregunta 2 · Práctica obligatoria'],['pau-q3','Pregunta 3 · Prácticas A y B'],['pau-q4','Pregunta 4 · Conceptos A y B'],['pau-general','Modelos completos y criterios generales']];
 // Add the PAU structure without replacing existing folders or documents.
 export function ensurePAUFolders(lib){const out=lib.map(f=>({...f,parentId:f.parentId||null}));if(!out.some(f=>f.id===PAU))out.push({id:PAU,title:'Material PAU',parentId:null,files:[]});for(const [id,title] of pauFolders){if(!out.some(f=>f.id===id||f.parentId===PAU&&f.title.toLocaleLowerCase('es')===title.toLocaleLowerCase('es')))out.push({id,title,parentId:PAU,files:[]})}return validateLibrary(out)}
-const kinds=['content','rubric','model','instructions','solution'];
+const kinds=['content','rubric','model','instructions','solution','guide'];
 const same=(a,b)=>a.kind===b.kind&&a.name===b.name&&a.data===b.data;
 export function folderPath(lib,id){const names=[],seen=new Set();while(id){if(seen.has(id))throw Error('Ciclo en carpetas.');seen.add(id);const f=lib.find(x=>x.id===id);if(!f)throw Error('Carpeta no encontrada.');names.unshift(f.title);id=f.parentId||null;}return names.join(' / ')}
 export function validateLibrary(lib){if(!Array.isArray(lib))throw Error('Repositorio inválido');const ids=new Set();for(const folder of lib){if(typeof folder.id!=='string'||ids.has(folder.id)||typeof folder.title!=='string'||!folder.title.trim()||!Array.isArray(folder.files))throw Error('Carpeta inválida');ids.add(folder.id);for(const f of folder.files)if(!kinds.includes(f.kind)||typeof f.name!=='string'||typeof f.data!=='string'||!/^data:[^,]*;base64,/.test(f.data))throw Error('Archivo de repositorio inválido');}for(const f of lib)folderPath(lib,f.id);return lib}
@@ -13,9 +14,9 @@ export function addFolder(lib,title,parentId=null){return validateLibrary([...li
 export function renameFolder(lib,id,title){const f=lib.find(x=>x.id===id);if(!f)throw Error('Carpeta inexistente.');return validateLibrary(lib.map(x=>x.id===id?{...x,title:titleCheck(lib,title,f.parentId,id)}:x))}
 export function addLibraryFiles(lib,id,files){if(!lib.some(f=>f.id===id))throw Error('Selecciona una carpeta.');return validateLibrary(lib.map(f=>{if(f.id!==id)return f;const next=[...f.files];for(const file of files)if(!next.some(x=>same(x,file)))next.push(file);return {...f,files:next}}))}
 export function moveFile(lib,from,index,to){if(from===to)throw Error('Elige otra carpeta.');const f=lib.find(x=>x.id===from)?.files[index];if(!f)throw Error('Archivo inexistente.');return addLibraryFiles(lib,to,[f]).map(x=>x.id===from?{...x,files:x.files.filter((_,i)=>i!==index)}:x)}
-export function attachMaterials(materials,entries,{skipModel=false}={}){const out=structuredClone(materials);for(const f of entries){if(skipModel&&f.kind==='model')continue;const kind=['instructions','solution'].includes(f.kind)?'rubric':f.kind;if(!out[kind])throw Error('Tipo inválido');const name=f.kind==='instructions'?'Instrucciones — '+f.name:f.kind==='solution'?'Solucionario — '+f.name:f.name;if(!out[kind].some(x=>x.name===name&&x.data===f.data))out[kind].push({name,data:f.data,...(f.sourcePath?{sourcePath:f.sourcePath}:{}),...(['instructions','solution'].includes(f.kind)?{instruction:true,role:f.kind}:{})})}return out}
+export function attachMaterials(materials,entries,{skipModel=false}={}){const out=structuredClone(materials);for(const f of entries){if(skipModel&&f.kind==='model')continue;const kind=['instructions','solution','guide'].includes(f.kind)?'rubric':f.kind;if(!out[kind])throw Error('Tipo inválido');const name=f.kind==='instructions'?'Instrucciones — '+f.name:f.kind==='solution'?'Solucionario — '+f.name:f.name;if(!out[kind].some(x=>x.name===name&&x.data===f.data))out[kind].push({name,data:f.data,...(f.sourcePath?{sourcePath:f.sourcePath}:{}),...(['instructions','solution','guide'].includes(f.kind)?{instruction:true,role:f.kind}:{})})}return out}
 
-export const materialLabels={content:'Tema y otros contenidos',rubric:'Rúbrica y criterios de evaluación',solution:'Solucionario',model:'Examen original / modelo',instructions:'Instrucciones de corrección'};
+export const materialLabels={guide:'Guía única · rúbrica, instrucciones y solucionario',content:'Tema y otros contenidos',rubric:'Rúbrica y criterios de evaluación',solution:'Solucionario',model:'Examen original / modelo',instructions:'Instrucciones de corrección'};
 export function folderMaterials(lib,id,includePAU=false){validateLibrary(lib);if(!lib.some(f=>f.id===id))throw Error('Selecciona una carpeta.');const roots=new Set([id,...(includePAU&&lib.some(f=>f.id===PAU)?[PAU]:[])]);const selected=lib.filter(f=>{let current=f;while(current){if(roots.has(current.id))return true;current=lib.find(x=>x.id===current.parentId)}return false});return selected.flatMap(f=>f.files.map((file,index)=>({file,folderId:f.id,index,path:folderPath(lib,f.id)})))}
 export function hasRubric(materials){return !!materials.rubric?.some(f=>!f.instruction&&!['solution','instructions'].includes(f.role))}
 export function materialManifest(exam){return Object.entries(exam.materials||{}).flatMap(([kind,files])=>files.map(f=>({kind:f.role||(f.instruction?'instructions':kind),name:f.name,data:f.data,sourcePath:f.sourcePath})));}
@@ -26,7 +27,7 @@ export function packEntries(exam,prompt,pending=null,includeMaterials=true){cons
 // Vista de biblioteca: orden natural, conteos y filtros sin modificar el almacén.
 const natural=new Intl.Collator('es',{numeric:true,sensitivity:'base'});
 const searchKey=s=>String(s??'').normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase('es');
-export const libraryKinds=['content','rubric','solution','model','instructions'];
+export const libraryKinds=['content','model','guide','rubric','solution','instructions'];
 export function browseFolders(lib,parentId=null,query=''){
  const q=searchKey(query).trim(); const matches=lib.filter(f=>q?searchKey(folderPath(lib,f.id)).includes(q):(f.parentId||null)===parentId);
  return matches.sort((a,b)=>(a.id===PAU?-1:b.id===PAU?1:natural.compare(q?folderPath(lib,a.id):a.title,q?folderPath(lib,b.id):b.title))).map(f=>{
@@ -41,7 +42,7 @@ export function browseFiles(folder,kind='all',query=''){
 // v13.1 — required material roles are independent of the file extension or filename.
 export function correctionType(exam){return exam?.correctionType==='task'?'task':'exam';}
 export function requiredRoles(exam){return correctionType(exam)==='task'?['model','rubric']:['content','instructions','rubric'];}
-export function missingRoles(exam){const m=materialManifest(exam);return requiredRoles(exam).filter(k=>!m.some(f=>f.kind===k&&f.data));}
+export function missingRoles(exam){const m=materialManifest(exam);const unified=m.some(f=>f.kind==='guide');return requiredRoles(exam).filter(k=>!m.some(f=>f.kind===k&&f.data)&&!(unified&&['rubric','instructions'].includes(k)));}
 export function correctionRoleLabel(kind,exam){return kind==='model'?(correctionType(exam)==='task'?'Enunciado de la tarea':'Enunciado del examen'):materialLabels[kind]||kind;}
 export function archiveReferenceFiles(lib,folderId,title,entries){
  let next=lib;let id=folderId;
@@ -61,4 +62,19 @@ export function archiveUnlinkedReferences(lib,exam,folderId=null){
   f.sourcePath=folderPath(library,folder.id);linked.push({kind,name,data:f.data,sourcePath:f.sourcePath,folderId:folder.id});
  }
  return {library,materials:updated,linked};
+}
+
+// Two document collections share only the folder tree and IDs. No duplicate folder records.
+export const repositoryKinds={materials:['content','model'],correction:['guide','rubric','instructions','solution']};
+export function repositoryView(lib,which){const allowed=repositoryKinds[which];if(!allowed)throw Error('Repositorio desconocido');return lib.map(f=>({...f,files:f.files.filter(d=>allowed.includes(d.kind))}));}
+export function guideDocument(data){let g;try{const bytes=Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0));g=JSON.parse(new TextDecoder().decode(bytes));}catch{throw Error('La guía única debe ser el archivo JSON generado por ChatGPT.');}if(g?.type!=='auto-ger-guide-v1'||!['exam','task'].includes(g.workType)||typeof g.modelName!=='string'||!g.modelName.trim()||!Array.isArray(g.contentNames)||g.contentNames.some(x=>typeof x!=='string'||!x.trim())||!g.instructions?.trim?.()||!g.solution?.trim?.())throw Error('Guía única incompleta: usa las instrucciones del paquete de preparación.');if(g.workType==='exam'&&!g.contentNames.length)throw Error('La guía de examen necesita el tema de referencia.');if(g.plan?.conflicts?.length)throw Error('La guía todavía tiene contradicciones sin resolver.');validatePlan(g.plan);return g;}
+export function unifiedGuide(exam){const m=materialManifest(exam),guides=m.filter(f=>f.kind==='guide');if(!guides.length)return null;if(guides.length!==1)throw Error('Selecciona una sola guía de corrección por prueba.');const g=guideDocument(guides[0].data);if(g.workType!==correctionType(exam))throw Error('La guía pertenece a otro tipo de trabajo.');if(!m.some(f=>f.kind==='model'&&f.name===g.modelName))throw Error('Selecciona el enunciado original indicado en la guía: '+g.modelName);const absent=g.contentNames.filter(n=>!m.some(f=>f.kind==='content'&&f.name===n));if(absent.length)throw Error('Selecciona los contenidos de esta guía: '+absent.join(', '));if(m.some(f=>['rubric','instructions','solution'].includes(f.kind)))throw Error('Desmarca las antiguas rúbricas, instrucciones y solucionarios: la guía única los sustituye para esta prueba.');return g;}
+
+// Resolve only unambiguous exact references within the selected folder tree.
+export function resolveGuideEntries(lib,folderId,workType,chosenGuide=null){
+ const entries=folderMaterials(lib,folderId);const gs=chosenGuide?[chosenGuide]:entries.filter(e=>e.file.kind==='guide'&&guideDocument(e.file.data).workType===workType);
+ if(gs.length!==1)return null;const e=gs[0],g=guideDocument(e.file.data);if(g.workType!==workType)return null;
+ const all=chosenGuide?lib.flatMap(f=>f.files.map((file,index)=>({file,index,folderId:f.id,path:folderPath(lib,f.id)}))):entries;
+ const pick=(kind,name)=>{const local=entries.filter(x=>x.file.kind===kind&&x.file.name===name);const found=local.length?local:all.filter(x=>x.file.kind===kind&&x.file.name===name);const unique=[...new Map(found.map(x=>[x.file.data,x])).values()];return unique.length===1?unique[0]:null;};
+ const refs=[pick('model',g.modelName),...g.contentNames.map(n=>pick('content',n))];return refs.every(Boolean)?[e,...refs]:null;
 }
