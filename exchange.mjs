@@ -20,3 +20,51 @@ export function makeCode(state){return 'EX-'+String(state.next++).padStart(4,'0'
 export function preparationPrompt(model,contents,workType='exam'){return `AUTO - GER · Preparación de una guía única reutilizable. Lee el enunciado ${model} y los contenidos seleccionados: ${contents.join('; ')||'ninguno'}. Elabora conjuntamente rúbrica detallada, instrucciones y solucionario coherentes. No inventes respuestas ni mapas; solicita lo que falte. Respeta las instrucciones explícitas del docente y no vuelvas a solicitar aclaraciones ya resueltas. Registra las decisiones resueltas en plan.guide; plan.conflicts solo contiene conflictos pendientes reales. Para nuevas pruebas diferencia Cordillera Penibética y Cordillera Subbética; en exámenes anteriores respeta el enunciado y excepciones expresamente aprobadas. ${workType==='exam'?rules:taskRules} Los criterios deben ser compatibles con el motor: cada localización usa kind=map, topónimos exactos y puntuación binaria; cualquier reparto parcial requiere subapartados independientes explícitos de rúbrica, no una aproximación implícita. No asignes notas docentes. Si falta información, solicita la aclaración antes de entregar el archivo. Devuelve un archivo descargable JSON, sin texto externo, con el siguiente esquema y los nombres de fuentes EXACTOS. Los máximos de los ítems suman 10; usa un ítem por concepto, localización y criterio de desarrollo; para PAU incluye questionNumber y alternativas excluyentes en un único máximo. En criteria incluye la respuesta esperada y los niveles de crédito.
 ${JSON.stringify({type:'auto-ger-guide-v1',workType,modelName:model,contentNames:contents,instructions:'Instrucciones completas y excepciones docentes',solution:'Solucionario completo por pregunta',plan:{guide:'Criterios generales, decisiones resueltas y referencias',conflicts:[],items:[{id:'1a',questionNumber:1,name:'Indicador',kind:'normal',max:2.5,criteria:'Respuesta esperada y criterios de puntuación',accepted:[]}]}},null,2)}`;}
 export function planFromRepository(exam){const g=unifiedGuide(exam);if(!g)return null;return importPlan(exam,{type:'pau-plan-v1',examId:exam.id,plan:{...g.plan,guide:g.plan.guide+'\n\nINSTRUCCIONES:\n'+g.instructions+'\n\nSOLUCIONARIO:\n'+g.solution}});}
+
+// v15: collective interchange, with one locked rubric and explicit page identities.
+export function batchManifest(exam,pending){
+ referenceGuard(exam);validatePlan(exam.plan);
+ if(!Array.isArray(pending)||!pending.length||pending.length>99)throw Error('Selecciona de 1 a 99 exámenes pendientes.');
+ const seen=new Set();const entries=pending.map(p=>{if(p.examId!==exam.id||seen.has(p.code)||!p.requestId||!Array.isArray(p.photos)||!p.photos.length||p.photos.length>20)throw Error('Lote incoherente.');seen.add(p.code);return {code:p.code,requestId:p.requestId,pageCount:p.photos.length,files:p.photos.map((_,i)=>`${p.code}-P${String(i+1).padStart(2,'0')}.jpg`),...(p.batchSource?{originalPages:batchPages(p.batchSource)}:{})}});
+ return {type:'auto-ger-batch-manifest-v1',examId:exam.id,title:exam.title,workType:correctionType(exam),examStyle:exam.examStyle||'pau-custom',plan:exam.plan,entries};
+}
+export function batchCorrectionPrompt(exam,pending){
+ const manifest=batchManifest(exam,pending),first=pending[0];
+ const individual=correctionPrompt(exam,first).split('GUÍA BLOQUEADA:')[1];
+ return `AUTO - GER · CORRECCIÓN COLECTIVA. Lee 01-manifiesto.json, los documentos docentes y todas las imágenes de cada código. El manifiesto es la única correspondencia válida: nunca mezcles códigos ni uses el orden físico para identificar una pregunta. El nombre real no es necesario. Si detectas datos personales, no los reproduzcas. No uses las respuestas de otros alumnos como criterio. Aplica exclusivamente la guía bloqueada y sus excepciones, sin pedir otra guía. ${correctionType(exam)==='task'?taskRules:rules}\nEl PDF es solo una copia visual del lote; para interpretar manuscritos usa los JPG originales incluidos. Abre y visualiza las imágenes realmente; si no puedes leer todas, solicita imágenes o devuelve únicamente los exámenes completos, no inventes lecturas ni notas. Analiza las páginas en lotes pequeños y conserva el progreso.\nDevuelve un ARCHIVO descargable correcciones.json (no pegues todo en el chat) con esta envoltura: {"type":"auto-ger-batch-v1","examId":"${exam.id}","title":${JSON.stringify(exam.title)},"workType":"${manifest.workType}","examStyle":"${manifest.examStyle}","plan": [objeto plan EXACTO de 01-manifiesto.json],"results":[objetos pau-result-v1]} . En cada objeto conserva examId, code y requestId del manifiesto, añade pageCount igual al número de imágenes y todos los campos del formato individual inferior. plan es un objeto, NO una lista ni un marcador de posición. No devuelvas la calificación docente, ni redondees. Puedes devolver varios JSON parciales con la misma envoltura si el lote es demasiado grande; incluye solo resultados realmente terminados, nunca repitas códigos.\nEl ejemplo individual que sigue corresponde SOLO a ${first.code}. Sustituye sus identificadores y las referencias de página por las de cada entrada del manifiesto; notes.page siempre es el índice local de la imagen del alumno, NO la página del PDF colectivo. ${exam.examStyle==='pau'?'Incluye choices 3 y 4 y respeta las opciones excluyentes.':''}\nGUÍA BLOQUEADA:${individual}`;
+}
+export function batchResultRows(raw){
+ if(raw?.type==='pau-result-v1')return [raw];
+ if(raw?.type!=='auto-ger-batch-v1'||typeof raw.examId!=='string'||!Array.isArray(raw.results)||!raw.results.length||raw.results.length>99)throw Error('Se esperaba un JSON individual pau-result-v1 o colectivo auto-ger-batch-v1.');
+ const seen=new Set();for(const r of raw.results){if(r?.type!=='pau-result-v1'||r.examId!==raw.examId||typeof r.code!=='string'||seen.has(r.code))throw Error('El lote contiene identificadores repetidos o de otra prueba.');seen.add(r.code);}
+ return raw.results;
+}
+export function correctionIncidents(record){const r=record.result;return [...new Set([...(r.flags||[]),...r.items.filter(i=>i.review).map(i=>'Revisar '+i.name),...r.items.filter(i=>i.points<i.max&&!i.improvement?.trim()).map(i=>'Falta punto de mejora: '+i.name),...((r.choices&&Object.values(r.choices).includes('uncertain'))?['Opción PAU dudosa']:[]),...(!record.photos?.length?['Sin imágenes originales asociadas']:[]),...(r.items.some(i=>i.points<i.max)&&!(r.notes||[]).length?['Faltan anotaciones sobre las deducciones']:[])])];}
+// All changes staged on a copy. Invalid entries never overwrite existing records.
+export function importBatchResults(state,raw,{standalone=false,scope=null}={}){
+ const rows=batchResultRows(raw),next=structuredClone(state),added=[],errors=[],duplicates=[];
+ const id=rows[0].examId;if(scope&&id!==scope)throw Error('El JSON pertenece a otra prueba.');
+ let exam=next.exams.find(e=>e.id===id);
+ if(!exam){
+  if(!standalone||raw.type!=='auto-ger-batch-v1')throw Error('No existe esta prueba localmente. Para importar sin prueba, necesitas un lote que incluya la guía.');
+  if(typeof id!=='string'||!id.trim()||id.length>180||typeof raw.title!=='string'||!raw.title.trim()||raw.title.length>180||!['exam','task'].includes(raw.workType))throw Error('Contexto de corrección independiente incompleto.');
+  validatePlan(raw.plan);if(raw.plan.conflicts?.length)throw Error('La guía contiene conflictos pendientes.');
+  if(raw.workType==='task'&&raw.plan.items.some(i=>i.kind!=='normal'))throw Error('Una tarea requiere apartados normales.');
+  exam={id,title:raw.title,materials:{model:[],content:[],rubric:[]},plan:structuredClone(raw.plan),correctionType:raw.workType,examStyle:raw.examStyle==='pau'?'pau':'pau-custom',importOnly:true};next.exams.push(exam);
+ }
+ if(!exam.plan)throw Error('La prueba no dispone de una guía validada.');
+ if(exam.importOnly&&raw.plan&&JSON.stringify(raw.plan)!==JSON.stringify(exam.plan))throw Error('El lote independiente no conserva la misma guía de la prueba importada.');
+ for(const row of rows){try{
+  if(typeof row.code!=='string'||row.code.length>120||typeof row.requestId!=='string'||!row.requestId||row.requestId.length>180)throw Error('Identificadores inválidos.');
+  const old=next.records.find(r=>r.examId===id&&(r.code===row.code||r.externalCode===row.code));if(old){duplicates.push(row.code);continue;}
+  const p=next.pending.find(p=>p.examId===id&&p.code===row.code);
+  if(!p&&!exam.importOnly)throw Error('No existe un examen local con este código.');
+  const n=p?.photos.length??row.pageCount;if(!Number.isInteger(n)||n<1||n>20||(row.pageCount!==undefined&&row.pageCount!==n))throw Error('Número de páginas incoherente.');
+  const checked=importResult(exam.importOnly?{...exam,correctionType:undefined}:exam,p||{code:row.code,requestId:row.requestId,photos:Array(n).fill('')},row);
+  let code=p?.code??makeCode(next);const record={code,examId:id,requestId:row.requestId,result:checked,grade:grade(checked,exam),provisional:true,pageCount:n,...(p?{photos:p.photos,...(p.localName!==undefined?{localName:p.localName}:{}),...(p.batchSource?{batchSource:p.batchSource}:{})}:{externalCode:row.code})};
+  next.records.push(record);if(p)next.pending=next.pending.filter(x=>x!==p);added.push(code);
+ }catch(e){errors.push(`${row.code||'Sin código'}: ${e.message}`);}}
+ if(!added.length&&errors.length&&!duplicates.length)throw Error(errors.join(' · '));
+ if(exam.importOnly&&!next.records.some(r=>r.examId===id))next.exams=next.exams.filter(e=>e.id!==id);
+ return {next,added,errors,duplicates,examId:id};
+}

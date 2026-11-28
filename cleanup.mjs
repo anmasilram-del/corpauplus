@@ -1,4 +1,4 @@
-import {csvCell,officialGrade} from './core.mjs';
+import {csvCell,officialGrade,localStudentName} from './core.mjs';
 export const ALL='__all__';
 function target(state,id){
  if(id===ALL)return ()=>true;
@@ -11,7 +11,7 @@ export function cleanupSummary(state,id){
 }
 export function exportGrades(state,id=ALL){
  const match=target(state,id);
- return '\ufeff'+[['Código','Prueba','Nota técnica exacta / 10','Calificación docente / 10'],...state.records.filter(match).map(r=>[r.code,state.exams.find(e=>e.id===r.examId)?.title,r.grade.final.toFixed(2).replace('.',','),officialGrade(r.grade)])].map(row=>row.map(csvCell).join(';')).join('\r\n');
+ return '\ufeff'+[['Código','Nombre y apellidos','Prueba','Nota técnica exacta / 10','Calificación docente / 10','Estado de corrección'],...state.records.filter(match).map(r=>[r.code,localStudentName(state,r),state.exams.find(e=>e.id===r.examId)?.title,r.grade.final.toFixed(2).replace('.',','),officialGrade(r.grade),r.provisional?'Propuesta':'Confirmada'])].map(row=>row.map(csvCell).join(';')).join('\r\n');
 }
 export function cleanupState(state,id,{keepMaterials=false,acknowledged=false,allowPending=false,confirmation='',eraseLibrary=false}={}){
  const match=target(state,id),summary=cleanupSummary(state,id);

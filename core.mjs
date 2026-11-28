@@ -25,3 +25,17 @@ export function officialGrade(grade){const value=grade?.official;if(value==null)
 export function assignOfficial(grade,value){if(!grade||!Number.isFinite(grade.final)||grade.final<0||grade.final>10)throw Error('Nota técnica inválida.');if(typeof value!=='string'&&typeof value!=='number')throw Error('Selecciona una nota entera de 0 a 10.');if(typeof value==='string'&&!/^(?:[0-9]|10)$/.test(value))throw Error('Selecciona una nota entera de 0 a 10.');const n=Number(value);if(!Number.isInteger(n)||n<0||n>10)throw Error('Selecciona una nota entera de 0 a 10.');return {...grade,official:n};}
 export function officialLabel(grade){const n=officialGrade(grade);return n===null?'Pendiente':String(n);}
 export function exactLabel(grade){return grade.final.toFixed(2).replace('.',',');}
+
+// Local identity only: never infer a name from the ordinal of an unnumbered PDF.
+export function localStudentName(state,record){
+ if(typeof record.localName==='string')return record.localName;
+ const e=state.exams.find(x=>x.id===record.examId),n=e?.numbering;
+ const c=state.classes?.find(x=>x.id===e?.classId);
+ if(!n||!c||!record.code)return '';
+ const p=`${String(n.topic).padStart(2,'0')}-${n.subject}${n.group}-${String(n.test).padStart(2,'0')}-`;
+ if(!record.code.startsWith(p)||!/^\d{2}$/.test(record.code.slice(p.length)))return '';
+ const number=Number(record.code.slice(p.length));
+ return number>=1&&number<=n.count?c.students.find(s=>s.number===number)?.name||'':'';
+}
+export function cleanLocalName(value){if(typeof value!=='string'||value.length>180||/[\u0000-\u001f\u007f]/.test(value))throw Error('Nombre no válido (máximo 180 caracteres).');return value.trim().normalize('NFC');}
+export function validateLocalNames(state){const seen=new Set();for(const r of [...state.pending,...state.records]){if(r.localName!==undefined)cleanLocalName(r.localName);const name=localStudentName(state,r);if(!name)continue;const key=JSON.stringify([r.examId,name.normalize('NFC').trim().toLocaleLowerCase('es').replace(/\s+/g,' ')]);if(seen.has(key))throw Error('Nombre repetido en la misma prueba: '+name+'. Comprueba la identificación.');seen.add(key);}return state;}
